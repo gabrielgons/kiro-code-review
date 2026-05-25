@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "code-review-server": {
+      "command": "npx",
+      "args": ["-y", "tsx", "${POWER_DIR}/src/index.ts"],
+      "env": {
+        "GITHUB_TOKEN": "GITHUB_TOKEN_ENV_VAR"
+      }
+    }
+  }
+}
