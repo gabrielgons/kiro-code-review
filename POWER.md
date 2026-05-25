@@ -241,3 +241,12 @@ A review that only checks "naming" and "DRY" without stack-specific knowledge is
 ### No project guidelines found
 - The power will fall back to general best practices based on detected stack
 - Consider creating a `CONTRIBUTING.md` or `docs/architecture.md` in your project
+
+## License and support
+
+This power is licensed under the [MIT License](https://opensource.org/licenses/MIT).
+
+It integrates with [@modelcontextprotocol/server-github](https://github.com/modelcontextprotocol/servers/tree/main/src/github) (MIT).
+
+- [Privacy Policy](https://github.com/gabrielgons/kiro-code-review/blob/main/PRIVACY.md)
+- [Support](https://github.com/gabrielgons/kiro-code-review/issues)
