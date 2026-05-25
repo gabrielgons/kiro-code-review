@@ -1,163 +1,146 @@
 # Code Review Power for Kiro
 
-A Kiro Power that provides automated, senior-level code review for Pull Requests. Analyzes code against industry-standard principles and project-specific guidelines.
+A Kiro Power that provides automated, senior-level code review for Pull Requests. Pragmatic by design — no nitpicking, just real value.
 
-## Features
+## What It Does
 
-- **Comprehensive Analysis**: Reviews code against OWASP, SOLID, KISS, DRY, Clean Code, and 10+ other principle categories
-- **Project-Aware**: Detects tech stack and respects project documentation (architecture docs, coding standards, etc.)
-- **Severity Classification**: Color-coded findings (Red/Orange/Green) with actionable suggestions
-- **Report Generation**: Creates detailed `.md` reports with code snippets and improvement explanations
-- **GitHub Integration**: Posts inline review comments directly on PRs at the exact lines
-- **Extensible**: Architecture designed to support GitLab in the future
+1. You paste a GitHub PR URL
+2. The power fetches the diff, detects the tech stack, and finds project guidelines
+3. Analyzes code against 15+ principle categories (OWASP, SOLID, KISS, DRY, Clean Code, Architecture, Stack-Specific...)
+4. Generates a severity-classified report (🔴 Critical / 🟠 Medium / 🟢 Suggestion)
+5. Asks if you want to post inline comments directly on the PR
 
 ## Installation
 
 ### Prerequisites
 
 - [Kiro IDE](https://kiro.dev) installed
-- Node.js 18+
+- Node.js 18+ (for npx)
 - GitHub Personal Access Token with `repo` scope
 
-### Setup
+### Option 1: Install via Kiro Power Registry (Recommended)
 
-1. Clone or download this power to your local machine
-2. Install dependencies:
+Once published to the Kiro registry, install directly from the IDE power manager.
 
+### Option 2: Install from GitHub Repository
+
+1. Clone this repository:
 ```bash
-npm install
+git clone https://github.com/gabrielgons/kiro-code-review.git
 ```
 
-3. Build the TypeScript source:
+2. In Kiro, add the power by pointing to the local directory.
 
-```bash
-npm run build
-```
+### Option 3: Manual Configuration
 
-4. Set your GitHub token as an environment variable:
-
-```bash
-export GITHUB_TOKEN=your_token_here
-```
-
-5. Install the power in Kiro by adding the path to your power configuration
-
-### Kiro Configuration
-
-Add to your `~/.kiro/settings/mcp.json` under Powers:
+Add to your `~/.kiro/settings/mcp.json`:
 
 ```json
 {
   "mcpServers": {
-    "code-review-server": {
-      "command": "node",
-      "args": ["/path/to/kiro-code-review/dist/index.js"],
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
       "env": {
-        "GITHUB_TOKEN": "your_github_token"
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "your_token_here"
       }
     }
   }
 }
 ```
 
+> **Note:** If you already have the GitHub MCP server configured, you only need the power's steering files — no additional MCP setup required.
+
 ## Usage
 
-Once installed, simply mention "code review" or provide a PR URL in Kiro:
+Once installed, simply paste a PR URL in Kiro:
 
 ```
-Review this PR: https://github.com/owner/repo/pull/123
+https://github.com/owner/repo/pull/123
 ```
 
-The power will:
-1. Fetch the PR diff and metadata
-2. Detect the project stack
-3. Search for project-specific guidelines
-4. Analyze code against all principles
-5. Generate a detailed `.md` report
-6. Ask if you want to post comments on GitHub
+Or use natural language:
+- "Review this PR: https://github.com/..."
+- "Faça o code review desse PR"
+- "Analyze this pull request"
+
+The power activates automatically and starts the review.
+
+## What Gets Reviewed
+
+| Category | What's Checked |
+|----------|---------------|
+| **Security** | OWASP Top 10, hardcoded secrets, injection, XSS, auth issues |
+| **Architecture** | Cohesion, coupling, separation of concerns, project pattern adherence |
+| **SOLID** | Single responsibility, open/closed, Liskov, interface segregation, DI |
+| **KISS** | Over-engineering, premature optimization, unnecessary abstractions |
+| **DRY** | Code duplication, missed abstractions, repeated patterns |
+| **Clean Code** | Naming, function size, comments, error handling, organization |
+| **Performance** | N+1 queries, memory leaks, blocking operations, missing pagination |
+| **Error Handling** | Missing catches, swallowed errors, unhandled promises |
+| **Testing** | Missing tests, untestable code, edge cases |
+| **Stack-Specific** | Best practices for your exact tech stack (see below) |
+
+### Stack-Specific Knowledge
+
+The power adapts its review to your stack:
+
+- **Java/Spring Boot** — Transaction scope, DI patterns, JPA pitfalls
+- **.NET/C#** — async/await, DI lifetime, EF tracking
+- **Node.js/TypeScript** — Event loop, floating promises, strict mode
+- **React** — Render performance, hook rules, composition
+- **Vue.js** — Composition API, reactivity, computed caching
+- **Python/Django/FastAPI** — N+1 queries, type hints, async patterns
+- **Go** — Error wrapping, goroutine lifecycle, context propagation
+- **PostgreSQL** — Index awareness, migration safety
+- **Kubernetes** — Resource limits, probes, image pinning
+- **AWS** — IAM least privilege, VPC rules
 
 ## Severity Levels
 
-| Level | Color | Meaning |
-|-------|-------|---------|
-| Critical | :red_circle: Red | Security vulnerabilities, critical bugs, blocking issues |
-| Medium | :orange_circle: Orange | Bad practices, potential bugs, maintainability concerns |
-| Low | :green_circle: Green | Style suggestions, minor optimizations, nice-to-haves |
-
-## Review Principles
-
-The power evaluates code against:
-
-- **Security**: OWASP Top 10 (Injection, XSS, Auth, Data Exposure, etc.)
-- **SOLID**: Single Responsibility, Open/Closed, Liskov, Interface Segregation, Dependency Inversion
-- **KISS**: Keep It Simple, Stupid - flags over-engineering and unnecessary complexity
-- **DRY**: Don't Repeat Yourself - identifies code duplication
-- **Clean Code**: Naming, function size, comments, formatting
-- **Performance**: N+1 queries, memory leaks, unnecessary computation
-- **Error Handling**: Missing catches, empty handlers, error propagation
-- **Testing**: Missing tests, untestable code, edge cases
-- **API Design**: REST conventions, status codes, validation
-- **Architecture**: Separation of concerns, coupling, cohesion
-- **Documentation**: Missing docs, outdated comments
-- **Git Hygiene**: PR size, commit quality, debug code
+| Level | Color | Meaning | Action |
+|-------|-------|---------|--------|
+| Critical | 🔴 | Security flaws, crashes, data loss | Must fix before merge |
+| Medium | 🟠 | Bad practices, potential bugs, maintainability | Should be addressed |
+| Suggestion | 🟢 | Nice-to-haves, minor optimizations | Optional |
 
 ## Project Guidelines Priority
 
-If the project contains documentation files like:
-- `CONTRIBUTING.md`
-- `docs/architecture.md`
-- `docs/coding-standards.md`
-- `STYLEGUIDE.md`
+If your project has documentation files like `CONTRIBUTING.md`, `docs/architecture.md`, or `docs/coding-standards.md`, these take **absolute priority** over general best practices.
 
-These take **absolute priority** over general best practices during review.
-
-## Development
-
-```bash
-# Install dependencies
-npm install
-
-# Run in development mode
-npm run dev
-
-# Build for production
-npm run build
-
-# Start production server
-npm start
-```
-
-## Architecture
+## Structure
 
 ```
 kiro-code-review/
-├── POWER.md              # Power documentation & frontmatter
-├── mcp.json              # MCP server configuration
-├── steering/             # Steering files (workflows & principles)
-│   ├── review-principles.md   # All review criteria
-│   ├── review-workflow.md     # Step-by-step workflow
-│   └── report-template.md    # Report format specification
-├── src/                  # MCP server source code
-│   ├── index.ts               # Server entry point & tool definitions
-│   ├── types.ts               # TypeScript type definitions
-│   ├── utils/
-│   │   └── url-parser.ts      # PR URL parsing (GitHub/GitLab)
-│   └── providers/
-│       ├── base-provider.ts   # Abstract provider interface
-│       ├── github-provider.ts # GitHub API implementation
-│       └── index.ts           # Provider exports
-├── package.json
-└── tsconfig.json
+├── POWER.md                    # Power documentation & activation keywords
+├── mcp.json                    # MCP server config (official GitHub server)
+├── steering/
+│   ├── review-principles.md    # All review criteria (15 sections)
+│   ├── review-workflow.md      # Step-by-step workflow
+│   └── report-template.md     # Report format specification
+├── README.md
+└── .gitignore
 ```
+
+**No custom server code.** The intelligence lives entirely in the steering files. The GitHub API interaction is handled by the official `@modelcontextprotocol/server-github`.
+
+## Contributing
+
+Contributions are welcome! Areas where you can help:
+
+- Add more stack-specific best practices
+- Improve review principles
+- Add GitLab support (future)
+- Translate steering files to other languages
+- Report false positives or missing checks
 
 ## Future Roadmap
 
 - [ ] GitLab Merge Request support
 - [ ] Bitbucket PR support
 - [ ] Custom rule definitions via `.code-review.yml`
-- [ ] Auto-fix suggestions using AI
-- [ ] Historical review tracking
 - [ ] Team-specific review profiles
+- [ ] Integration with SonarQube findings
 
 ## License
 

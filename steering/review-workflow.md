@@ -4,6 +4,8 @@
 
 This steering file defines the step-by-step workflow for conducting a complete code review using this power. Follow these steps in order for every review.
 
+**This power uses the official GitHub MCP server tools.** All GitHub interactions are done via `@modelcontextprotocol/server-github`.
+
 ---
 
 ## Step 1: Parse PR URL
@@ -19,21 +21,28 @@ https://github.com/{owner}/{repo}/pull/{number}/commits
 
 **Validation:**
 - URL must be a valid GitHub PR URL
-- Extract: `owner`, `repo`, `pr_number`
+- Extract: `owner`, `repo`, `pull_number`
 - If invalid, ask the user to provide a correct URL
 
 ---
 
 ## Step 2: Fetch PR Data
 
-Use `fetch_pull_request` tool with the extracted parameters.
+Use the official GitHub MCP tools:
 
-**Data to collect:**
-- PR title and description
-- Author and branch info
-- List of changed files with status (added/modified/deleted)
-- Full unified diff for each file
-- Number of additions and deletions
+### 2.1 Get PR metadata
+```
+Tool: get_pull_request
+Params: owner, repo, pull_number
+```
+Returns: title, body (description), user (author), head/base refs, additions, deletions, changed_files count, state, mergeable status.
+
+### 2.2 Get changed files with diffs
+```
+Tool: get_pull_request_files
+Params: owner, repo, pull_number
+```
+Returns: array of files with `filename`, `status` (added/modified/removed/renamed), `additions`, `deletions`, `patch` (unified diff).
 
 **Error handling:**
 - If 404: Repository or PR not found - verify access
@@ -44,32 +53,56 @@ Use `fetch_pull_request` tool with the extracted parameters.
 
 ## Step 3: Detect Project Stack
 
-Use `detect_project_stack` tool on the repository.
+Use `get_file_contents` to check for stack-indicator files in the repository root:
 
-**Detection strategy:**
-1. Check `package.json` for Node.js/JS/TS projects
-2. Check `requirements.txt` / `pyproject.toml` for Python
-3. Check `go.mod` for Go
-4. Check `pom.xml` / `build.gradle` for Java
-5. Check `Cargo.toml` for Rust
-6. Check `Gemfile` for Ruby
-7. Analyze file extensions in changed files
-8. Check for framework-specific files (next.config.js, angular.json, etc.)
+### Detection strategy:
+
+```
+Tool: get_file_contents
+Params: owner, repo, path="package.json"
+```
+
+1. **package.json** → Node.js/JS/TS — parse dependencies for:
+   - React, Next.js, Vue, Nuxt, Angular, Svelte (frontend)
+   - Express, Fastify, NestJS, Hono, Koa (backend)
+   - Jest, Vitest, Mocha, Playwright (testing)
+   - ESLint, Prettier, Biome (linting)
+   - Vite, Webpack, tsup (bundling)
+
+2. **requirements.txt** / **pyproject.toml** → Python — check for Django, FastAPI, Flask, pytest
+
+3. **go.mod** → Go
+
+4. **pom.xml** / **build.gradle** → Java/Kotlin — check for Spring Boot
+
+5. **Cargo.toml** → Rust
+
+6. **Gemfile** → Ruby — check for Rails
+
+7. **.csproj** / **\*.sln** → .NET/C#
+
+8. Check file extensions in the PR changed files for additional signals
 
 **Output:**
 - Primary language(s)
 - Framework(s) detected
-- Build tool / package manager
 - Test framework (if detectable)
-- Linter/formatter configuration (if present)
+- Linter/formatter (if configured)
+- Package manager
 
 ---
 
 ## Step 4: Find Project Guidelines
 
-Use `find_project_guidelines` tool to search for documentation files.
+Use `get_file_contents` to search for documentation files.
 
 **Files to search for (priority order):**
+
+```
+Tool: get_file_contents
+Params: owner, repo, path="CONTRIBUTING.md"
+```
+
 1. `CONTRIBUTING.md` - Contribution guidelines
 2. `docs/architecture.md` - Architecture documentation
 3. `docs/coding-standards.md` - Coding standards
@@ -78,8 +111,15 @@ Use `find_project_guidelines` tool to search for documentation files.
 6. `STYLEGUIDE.md` - Style guide
 7. `docs/api-guidelines.md` - API design guidelines
 8. Any `.md` file in `docs/` directory with relevant keywords
-9. `.eslintrc` / `.prettierrc` / `tsconfig.json` - Tool configurations as implicit standards
-10. `ADR/` directory - Architecture Decision Records
+9. `.eslintrc.*` / `.prettierrc.*` / `biome.json` / `tsconfig.json` - Tool configurations as implicit standards
+10. `ADR/` or `docs/adr/` directory - Architecture Decision Records
+
+**To list directories:**
+```
+Tool: get_file_contents
+Params: owner, repo, path="docs"
+```
+(Returns directory listing when path is a directory)
 
 **Important:** If project guidelines are found, they take **absolute priority** over general principles. The review should be conducted primarily through the lens of the project's own standards.
 
@@ -106,6 +146,7 @@ For each changed file, perform analysis against the principles in `review-princi
    - SOLID violations
    - Breaking established patterns
    - Introducing tight coupling
+   - Not following project architecture
 
 4. **Code quality** (Orange severity)
    - DRY violations
@@ -113,17 +154,21 @@ For each changed file, perform analysis against the principles in `review-princi
    - Error handling gaps
    - Missing validation
 
-5. **Maintainability** (Green/Orange severity)
+5. **Stack-specific issues** (Orange/Red depending on severity)
+   - Apply Section 14 from review-principles.md
+   - Must use best practices for the specific detected stack
+
+6. **Maintainability** (Green/Orange severity)
    - Clean Code violations
    - Naming issues
    - Documentation gaps
    - Test coverage concerns
 
-6. **Suggestions** (Green severity)
+7. **Suggestions** (Green severity)
    - Performance optimizations
    - Better patterns/approaches
-   - Style improvements
    - Modern language features
+   - Max 5-7 per PR
 
 **For each finding, capture:**
 - File path
@@ -131,86 +176,30 @@ For each changed file, perform analysis against the principles in `review-princi
 - Severity (green/orange/red)
 - Category (Security, Architecture, Quality, etc.)
 - Description of the issue
-- Explanation of WHY it's a problem
+- Explanation of WHY it's a problem (real-world impact)
 - Suggested fix with code example (when applicable)
+
+**PRAGMATISM CHECK (apply to every finding before including it):**
+- Does this actually cause a real-world problem? If not → discard
+- Is this a personal preference? If yes → discard
+- Is this handled by a linter? If yes → discard
+- Is this outside the PR scope? If yes → discard
 
 ---
 
 ## Step 6: Generate Report
 
-Use `generate_review_report` tool with all findings.
+Generate a Markdown report following the template in `steering/report-template.md`.
 
 **Report structure:**
-
-```markdown
-# Code Review Report
-
-## PR Information
-- **Title**: {pr_title}
-- **Author**: {pr_author}
-- **Branch**: {source_branch} -> {target_branch}
-- **Files Changed**: {count}
-- **Additions**: +{additions} / Deletions: -{deletions}
-
-## Summary
-
-| Severity | Count | 
-|----------|-------|
-| :red_circle: Critical | X |
-| :orange_circle: Medium | X |
-| :green_circle: Low/Suggestion | X |
-
-## Overall Assessment
-
-{Brief paragraph on code quality, main concerns, and positive aspects}
-
-## Detailed Findings
-
-### :red_circle: Critical Issues
-
-#### [{Category}] {Title}
-- **File**: `{file_path}`
-- **Line(s)**: {line_numbers}
-- **Principle**: {violated_principle}
-
-**Problem:**
-{Description of the issue}
-
-**Current Code:**
-```{language}
-{problematic_code}
-```
-
-**Suggested Fix:**
-```{language}
-{improved_code}
-```
-
-**Why this matters:** {Explanation of impact}
-
----
-
-### :orange_circle: Medium Issues
-{Same format as above}
-
----
-
-### :green_circle: Suggestions
-{Same format as above}
-
-## Reviewed Principles
-- [x] Security (OWASP)
-- [x] SOLID
-- [x] KISS
-- [x] DRY
-- [x] Clean Code
-- [x] Performance
-- [x] Error Handling
-- [x] Project Standards (if applicable)
-
-## Notes
-{Any additional observations, positive feedback, or general recommendations}
-```
+- PR Information table
+- Project context (stack, guidelines found)
+- Executive Summary (count by severity + overall assessment)
+- Detailed Findings (grouped by severity: Red → Orange → Green)
+- Files Reviewed table
+- Review Checklist
+- Positive Highlights
+- Recommendations (before merge / should address / consider for future)
 
 ---
 
@@ -221,19 +210,24 @@ After generating the report, present a concise overview:
 ```
 ## Review Complete!
 
-**PR**: {title} by {author}
+**PR**: {title} by @{author}
 **Files analyzed**: {count}
+**Stack**: {detected_stack}
 
 ### Findings Summary:
-- :red_circle: {X} critical issues requiring immediate attention
-- :orange_circle: {X} medium issues that should be addressed  
-- :green_circle: {X} suggestions for improvement
+- 🔴 {X} critical issues requiring immediate attention
+- 🟠 {X} medium issues that should be addressed
+- 🟢 {X} suggestions for improvement
 
-### Top Critical Issues:
+### Top Issues:
 1. {Brief description of most critical finding}
 2. {Brief description of second most critical finding}
+3. {Brief description of third finding}
 
-The full report has been saved to `{report_filename}`.
+### Overall Assessment:
+{1-2 sentences on code quality and recommendation}
+
+The full report is below / has been saved.
 ```
 
 ---
@@ -243,39 +237,101 @@ The full report has been saved to `{report_filename}`.
 Ask the user:
 
 > "Would you like me to post these review comments as inline comments on the GitHub PR? I can post:
-> - All findings (X comments)
-> - Only critical and medium issues (X comments)  
-> - Only critical issues (X comments)
-> 
+> - All findings ({X} comments)
+> - Only critical and medium issues ({X} comments)
+> - Only critical issues ({X} comments)
+>
 > Or would you prefer to review the report first and select specific comments to post?"
 
 **If user agrees:**
 
-Use `post_review_comments` tool to create a PR review with:
-- A summary comment at the PR level
-- Inline comments on the specific lines in the diff
-- Each comment formatted with severity emoji, description, and suggestion
+Use the official GitHub MCP tool:
 
-**Comment format for GitHub:**
-
-```markdown
-{severity_emoji} **[{Category}]** {Title}
-
-{Problem description}
-
-**Suggestion:**
-```{language}
-{suggested_code}
+```
+Tool: create_pull_request_review
+Params:
+  owner: "{owner}"
+  repo: "{repo}"
+  pull_number: {number}
+  body: "{summary_comment}"
+  event: "COMMENT"
+  comments: [
+    {
+      "path": "src/example.ts",
+      "line": 42,
+      "body": "🔴 **[Security]** SQL Injection Risk\n\n..."
+    },
+    ...
+  ]
 ```
 
-> {Why this matters - brief explanation}
+### Comment format for each inline comment:
+
+**For Critical Issues:**
+```markdown
+🔴 **[{Category}]** {Title}
+
+{Problem description - 2-3 sentences max}
+
+**Suggested fix:**
+```{language}
+{code_suggestion}
+```
+
+> ⚠️ **Impact:** {Brief impact statement}
+```
+
+**For Medium Issues:**
+```markdown
+🟠 **[{Category}]** {Title}
+
+{Problem description - 2-3 sentences max}
+
+**Consider:**
+```{language}
+{code_suggestion}
+```
+```
+
+**For Suggestions:**
+```markdown
+🟢 **[{Category}]** {Title}
+
+{Suggestion - 1-2 sentences}
+
+```{language}
+{example_code}
+```
+```
+
+### PR-Level Summary Comment (the `body` parameter):
+
+```markdown
+## 🔍 Code Review Summary
+
+| Severity | Count |
+|----------|-------|
+| 🔴 Critical | {count} |
+| 🟠 Medium | {count} |
+| 🟢 Suggestion | {count} |
+
+### Key Observations
+
+{2-3 bullet points with the most important findings}
+
+### Recommendation
+
+{approve / request changes / needs discussion}
+
+---
+*Automated review by [Code Review Power](https://github.com/gabrielgons/kiro-code-review)*
 ```
 
 **Important considerations for posting:**
 - Comments must reference lines that exist in the diff (not arbitrary lines)
-- Use `side: "RIGHT"` for additions, `side: "LEFT"` for deletions
-- Group all comments into a single review submission when possible
-- Use `COMMENT` event (not `APPROVE` or `REQUEST_CHANGES`) to be non-blocking
+- Use `event: "COMMENT"` — never `APPROVE` or `REQUEST_CHANGES` (the power informs, never blocks)
+- Group all comments into a single review submission
+- If a comment targets a deleted line, use the appropriate diff position
 
 ---
 
@@ -288,7 +344,8 @@ Use `post_review_comments` tool to create a PR review with:
 | Empty diff | Inform user the PR has no code changes |
 | Rate limit reached | Inform user, suggest waiting |
 | Comment posting fails | Save comments locally, report which failed |
-| Large PR (>50 files) | Warn user, suggest reviewing in batches |
+| Large PR (>50 files) | Warn user, suggest reviewing in batches or focusing on critical files |
+| File not found (guidelines) | Skip silently, fall back to general best practices |
 
 ---
 
@@ -298,11 +355,11 @@ The workflow is designed to be extensible for GitLab:
 
 **Differences to implement:**
 - URL format: `https://gitlab.com/{group}/{project}/-/merge_requests/{number}`
-- API endpoints: GitLab Merge Request API
+- API: GitLab Merge Request API (different MCP server needed)
 - Comment format: GitLab Discussion/Note API
-- Authentication: GitLab Personal Access Token or OAuth
+- Authentication: GitLab Personal Access Token
 
-**Architecture consideration:**
-- The MCP server tools should accept a `platform` parameter (defaulting to "github")
-- URL parsing logic should detect the platform automatically
-- A provider abstraction should be used internally to route to GitHub or GitLab
+**When GitLab support is added:**
+- Add a GitLab MCP server to `mcp.json`
+- Update this workflow with GitLab-specific tool names
+- URL parsing should auto-detect the platform

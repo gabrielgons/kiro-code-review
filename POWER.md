@@ -12,9 +12,11 @@ author: "Gabriel Gons"
 
 This power provides an automated, senior-level code review experience for Pull Requests. It analyzes code changes against industry-standard principles and project-specific guidelines, generating a comprehensive report classified by severity and optionally posting inline review comments directly on GitHub.
 
+**This is a Knowledge Base Power** that uses the official GitHub MCP server (`@modelcontextprotocol/server-github`) for all GitHub API interactions. No custom server code — just pure review intelligence via steering files.
+
 ### Key Capabilities
 
-- **PR Analysis**: Fetches and analyzes Pull Request diffs from GitHub
+- **PR Analysis**: Fetches and analyzes Pull Request diffs from GitHub via official MCP tools
 - **Project-Aware**: Detects project stack and respects project documentation (architecture docs, coding standards, etc.)
 - **Multi-Principle Review**: Evaluates code against OWASP, SOLID, KISS, DRY, Clean Code, and more
 - **Severity Classification**: Categorizes findings using a color-coded system (Green/Orange/Red)
@@ -24,23 +26,23 @@ This power provides an automated, senior-level code review experience for Pull R
 
 ## Available Steering Files
 
-- **review-principles.md** - Complete reference of all code review principles (OWASP, SOLID, KISS, DRY, Clean Code, performance, testing, etc.)
+- **review-principles.md** - Complete reference of all code review principles (Pragmatism, OWASP, SOLID, KISS, DRY, Clean Code, Architecture, Stack-Specific, etc.)
 - **review-workflow.md** - Step-by-step workflow for conducting a code review, from PR fetch to comment posting
 - **report-template.md** - Template and format specification for the generated review report
 
-## Available MCP Server
+## MCP Server: GitHub (Official)
 
-### code-review-server
-
-Tools provided:
+This power uses the official `@modelcontextprotocol/server-github` maintained by the MCP team. The relevant tools for code review are:
 
 | Tool | Description |
 |------|-------------|
-| `fetch_pull_request` | Fetches PR metadata, diff, and changed files from GitHub |
-| `detect_project_stack` | Analyzes the repository to detect tech stack and frameworks |
-| `find_project_guidelines` | Searches for project documentation (.md files with architecture, standards, conventions) |
-| `generate_review_report` | Generates a severity-classified `.md` review report |
-| `post_review_comments` | Posts inline review comments on GitHub PR at specific lines |
+| `get_pull_request` | Get details of a specific pull request (title, description, author, branches) |
+| `get_pull_request_files` | Get the list of files changed in a pull request (with patches/diffs) |
+| `get_pull_request_comments` | Get the review comments on a pull request |
+| `get_pull_request_reviews` | Get the reviews on a pull request |
+| `get_file_contents` | Get the contents of a file or directory from a repository |
+| `search_code` | Search for code across GitHub repositories |
+| `create_pull_request_review` | Create a review on a pull request with inline comments |
 
 ## Workflow
 
@@ -60,75 +62,106 @@ The user provides a GitHub PR URL like:
 https://github.com/owner/repo/pull/123
 ```
 
+Parse it to extract: `owner`, `repo`, `pull_number`.
+
 ### 2. Fetch PR Data
 
-Use `fetch_pull_request` to retrieve:
-- PR metadata (title, description, author, branch)
-- Full diff with file changes
-- List of modified files
+Use the official GitHub MCP tools:
+
+```
+get_pull_request(owner, repo, pull_number)
+```
+→ Returns: title, description, author, head/base branches, additions/deletions count
+
+```
+get_pull_request_files(owner, repo, pull_number)
+```
+→ Returns: list of changed files with status, additions, deletions, and patch (unified diff)
 
 ### 3. Analyze Project Context
 
-Use `detect_project_stack` to identify:
-- Programming languages
-- Frameworks and libraries
-- Build tools and package managers
+Use `get_file_contents` to detect the project stack by checking for:
+- `package.json` → Node.js/TypeScript (check dependencies for React, Vue, Next.js, NestJS, etc.)
+- `requirements.txt` / `pyproject.toml` → Python (Django, FastAPI, Flask)
+- `go.mod` → Go
+- `pom.xml` / `build.gradle` → Java/Kotlin (Spring Boot)
+- `Cargo.toml` → Rust
+- `Gemfile` → Ruby (Rails)
+- `.csproj` → .NET/C#
 
-Use `find_project_guidelines` to search for:
-- Architecture documentation
-- Coding standards
-- Development guidelines
-- Any `.md` files that define project conventions
+Then search for project guidelines:
+```
+get_file_contents(owner, repo, "CONTRIBUTING.md")
+get_file_contents(owner, repo, "docs/architecture.md")
+get_file_contents(owner, repo, "docs/coding-standards.md")
+```
 
-**Priority**: If project guidelines exist, they take precedence over general best practices.
+Also check for linter/formatter configs (`.eslintrc`, `.prettierrc`, `biome.json`, `tsconfig.json`) as implicit standards.
+
+**Priority**: If project guidelines exist, they take **absolute precedence** over general best practices.
 
 ### 4. Perform Code Review
 
 Analyze each changed file against the principles defined in `steering/review-principles.md`:
 
+- **Pragmatism (Section 0)**: Filter out nitpicks, personal preferences, and style issues handled by linters
 - **Security (OWASP)**: Injection, auth, data exposure, XSS, etc.
-- **Architecture (SOLID)**: Single responsibility, open/closed, etc.
-- **Simplicity (KISS)**: Unnecessary complexity, over-engineering
-- **Reusability (DRY)**: Code duplication, missed abstractions
-- **Readability (Clean Code)**: Naming, functions, comments, formatting
+- **Architecture (Section 11)**: Cohesion, coupling, separation, adherence to project patterns, over-engineering
+- **SOLID**: Single responsibility, open/closed, etc.
+- **KISS**: Unnecessary complexity, over-engineering
+- **DRY**: Code duplication, missed abstractions
+- **Clean Code**: Naming, functions, comments, formatting
 - **Performance**: N+1 queries, memory leaks, unnecessary computation
 - **Error Handling**: Missing try/catch, unhandled promises, error propagation
 - **Testing**: Missing tests for critical paths, untestable code
+- **Stack-Specific (Section 14)**: Apply best practices specific to the detected stack
 - **Project Standards**: Compliance with project-specific guidelines
 
 ### 5. Generate Report
 
-Use `generate_review_report` to create a `.md` file with:
+Generate a `.md` report following the template in `steering/report-template.md`:
 - PR overview (title, author, files changed)
 - Summary of findings by severity
 - Detailed findings with code snippets, explanations, and suggestions
 - Severity legend with colors
+- Positive highlights
+- Recommendation (approve / request changes / discuss)
 
 ### 6. Present Overview
 
-Show the user a summary of the review:
+Show the user a concise summary:
 - Total findings count by severity
 - Critical issues that need immediate attention
 - Overall code quality assessment
+- Top 2-3 most important findings
 
 ### 7. Ask About GitHub Comments
 
 After presenting the overview, ask the user:
-> "Would you like me to post these review comments directly on the GitHub PR?"
+> "Would you like me to post these review comments directly on the GitHub PR? I can post:
+> - All findings (X comments)
+> - Only critical and medium issues (X comments)
+> - Only critical issues (X comments)"
 
-If yes, use `post_review_comments` to create inline comments on the exact lines with:
-- Severity indicator
-- Problem description
-- Suggestion for improvement
-- Code example when applicable
+If yes, use:
+```
+create_pull_request_review(owner, repo, pull_number, body, event, comments)
+```
+
+Where `comments` is an array of inline comments with:
+- `path`: file path
+- `line`: line number in the diff
+- `body`: formatted comment with severity emoji, description, and suggestion
+
+**Always use `event: "COMMENT"` (not APPROVE or REQUEST_CHANGES)** — the power provides information, never blocks.
 
 ## Severity Classification
 
 | Color | Level | Description | Action Required |
 |-------|-------|-------------|-----------------|
-| :green_circle: Green | Low | Suggestions, style improvements, minor optimizations | Optional improvement |
-| :orange_circle: Orange | Medium | Potential issues, attention needed, possible bugs | Should be addressed |
-| :red_circle: Red | High | Critical bugs, security vulnerabilities, blocking issues | Must be fixed before merge |
+| 🟢 Green | Low | Suggestions, style improvements, minor optimizations | Optional improvement |
+| 🟠 Orange | Medium | Potential issues, attention needed, possible bugs | Should be addressed |
+| 🔴 Red | High | Critical bugs, security vulnerabilities, blocking issues | Must be fixed before merge |
 
 ## Configuration
 
@@ -136,7 +169,7 @@ If yes, use `post_review_comments` to create inline comments on the exact lines 
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `GITHUB_TOKEN` | Yes | GitHub Personal Access Token with `repo` scope |
+| `GITHUB_PERSONAL_ACCESS_TOKEN` | Yes | GitHub Personal Access Token with `repo` scope |
 
 ### Token Permissions
 
@@ -194,7 +227,7 @@ A review that only checks "naming" and "DRY" without stack-specific knowledge is
 ## Troubleshooting
 
 ### Error: "Bad credentials"
-- Verify your `GITHUB_TOKEN` is valid and not expired
+- Verify your `GITHUB_PERSONAL_ACCESS_TOKEN` is valid and not expired
 - Ensure the token has the required scopes
 
 ### Error: "Not Found" when fetching PR
