@@ -463,7 +463,7 @@ DRY is about **knowledge duplication**, not just code duplication. Sometimes sim
 
 ## 14. Stack-Specific Best Practices
 
-> **Generic reviews are superficial.** A truly valuable review applies knowledge specific to the tech stack in use. This section instructs the reviewer to apply stack-aware best practices based on what `detect_project_stack` identifies.
+> **Generic reviews are superficial.** A truly valuable review applies knowledge specific to the tech stack in use. This section instructs the reviewer to apply stack-aware best practices based on the detected project stack.
 
 ### CRITICAL INSTRUCTION
 
