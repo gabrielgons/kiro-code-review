@@ -1,8 +1,8 @@
 ---
 name: "code-review"
 displayName: "Code Review"
-description: "Automated senior-level code review for Pull Requests. Analyzes code against OWASP, SOLID, KISS, DRY, Clean Code principles and project-specific guidelines. Generates detailed reports with severity classification and posts inline comments on GitHub."
-keywords: ["code review", "pull request", "PR review", "OWASP", "clean code", "SOLID", "DRY", "KISS", "security", "best practices", "github review", "merge request"]
+description: "Automated senior-level code review for Pull Requests. Analyzes code against OWASP, SOLID, KISS, DRY, Clean Code principles and project-specific guidelines with stack-aware best practices. Pragmatic by design — no nitpicking."
+keywords: ["code review", "pull request", "PR review", "review PR", "OWASP", "clean code", "SOLID", "DRY", "KISS", "security", "best practices", "github review", "merge request", "review this", "analyze PR", "github.com/pull"]
 author: "Gabriel Gons"
 ---
 
@@ -43,6 +43,15 @@ Tools provided:
 | `post_review_comments` | Posts inline review comments on GitHub PR at specific lines |
 
 ## Workflow
+
+### Activation
+
+This power activates when:
+- The user mentions "code review", "review PR", "review this PR", "analyze PR"
+- The user pastes a GitHub PR URL (e.g., `https://github.com/owner/repo/pull/123`)
+- The user asks to review, analyze, or check a Pull Request
+
+**When a PR URL is detected, immediately begin the review workflow without requiring additional confirmation.**
 
 ### 1. Receive PR URL
 
@@ -137,6 +146,42 @@ The GitHub token needs:
 
 ## Best Practices
 
+### Pragmatism First
+
+The most important rule: **DO NOT NITPICK.** Every comment must be classified as:
+
+| Level | When to Post | Example |
+|-------|-------------|---------|
+| 🚨 Critical | Always | SQL injection, null pointer in prod path |
+| ⚠️ Recommended | Always | Missing error handling, high coupling |
+| 💡 Suggestion | Max 5-7 per PR | Better naming, extract method |
+| 🤷 Personal preference | **NEVER POST** | "I'd use a ternary here" |
+
+**Rules:**
+- If a linter/formatter handles it, don't comment on it
+- If the code works and the approach is valid, don't suggest your personal alternative
+- If it's pre-existing code not changed in this PR, don't flag it
+- Always ask: "Does this actually cause a real-world problem?"
+
+### Stack-Aware Review
+
+This power does NOT do generic reviews. It applies **specific best practices for the detected stack**:
+
+- **Java/Spring**: Transaction scope, DI patterns, entity exposure, JPA pitfalls
+- **.NET/C#**: async/await correctness, DI lifetime, EF tracking, null safety
+- **Node.js/TS**: Event loop blocking, floating promises, TypeScript strictness
+- **React**: Render performance, hook rules, composition patterns, a11y
+- **Vue**: Composition API patterns, reactivity gotchas, computed caching
+- **Python/Django/FastAPI**: N+1 queries, type hints, Pydantic models, async patterns
+- **Go**: Error wrapping, goroutine lifecycle, interface placement, context propagation
+- **PostgreSQL**: Index awareness, migration safety, isolation levels
+- **Kubernetes**: Resource limits, probes, image pinning, network policies
+- **AWS**: IAM least privilege, VPC rules, managed service usage
+
+A review that only checks "naming" and "DRY" without stack-specific knowledge is **superficial and incomplete**.
+
+### Additional Principles
+
 1. **Always check project guidelines first** - Project-specific standards override general principles
 2. **Be constructive** - Every criticism should come with a suggestion
 3. **Prioritize severity** - Focus on critical issues first
@@ -144,6 +189,7 @@ The GitHub token needs:
 5. **Show examples** - Include corrected code snippets when possible
 6. **Respect style** - Don't nitpick formatting if it follows project conventions
 7. **Consider scope** - Review only what changed in the PR, not the entire codebase
+8. **Recognize good work** - Include positive highlights in the report
 
 ## Troubleshooting
 
